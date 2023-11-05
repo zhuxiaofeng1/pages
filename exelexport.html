@@ -1,0 +1,114 @@
+<html>
+
+<body>
+    <h>hello</h>
+    <a href="#" onclick="exceldownload()">导出excel</a>
+</body>
+<script>
+
+function jsonToExcel(column, headData, bodyData, sheetName = 'Excle表格') {
+    // 组装表头
+    let theadHtml = '';
+    headData.map(list => {
+      let th = ''
+      list.map(item => {
+        th += `
+          <th colspan="${item.colspan || 1}" rowspan="${item.rowspan || 1}">
+            ${item.text + '\t'}
+          </th>
+        `;
+      });
+      theadHtml += `<tr>${th}</tr>`
+    });
+  
+    // 组装表体
+    let tbodyHtml = ''
+    bodyData.map(item => {
+      let td = ''
+      column.map(n => {
+        const val = item[n.key] || ''
+        td += `<td style="text-align: center;">${val + '\t'}</td>`
+      });
+      tbodyHtml += `<tr>${td}</tr>`
+    });
+  
+    // 将table添加到html中，在html中加入excel和sheet元素
+    let template = `
+      <html lang="" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head>
+          <title></title>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                <x:Name>${sheetName}</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+        </head>
+        <body>
+          <table>
+            <thead>${theadHtml}</thead>
+            <tbody>${tbodyHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+  
+    // encodeURIComponent 解决中文乱码
+    const uri = 'data:text/xlsx;charset=utf-8,\ufeff' + encodeURIComponent(template);
+  
+    // 通过创建a标签实现
+    const link = document.createElement("a");
+    link.href = uri;
+    link.download = `${sheetName + '.xlsx'}`; // 设置文件名
+    link.click();
+  }
+      // 列
+  let column = [
+    { text: '姓名', key: 'name' },
+    { text: '身份证', key: 'personId' },
+    { text: '手机号', key: 'phone' },
+  ];
+ 
+  
+  // 表头
+  
+  let headData = [
+    [{ text: '幼儿园一年级', colspan: 3 }],
+    [
+      { text: '姓名', key: 'name' },
+      { text: '身份证', key: 'personId' },
+      { text: '手机号', key: 'phone' },
+    ]
+  ];
+  
+  
+  // 表体
+  let bodyData = [
+    {
+      name: '张三',
+      personId: '12345601',
+      phone: '15211112222',
+    },
+    {
+      name: '李四',
+      personId: '12345602',
+      phone: '15211112222',
+    },
+    {
+      name: '王五',
+      personId: '12345603',
+      phone: '15211112222',
+    },
+  ]
+  function exceldownload(){
+    jsonToExcel(column, headData, bodyData, '幼儿园一年级');
+  }
+  
+  </script>
+</html>

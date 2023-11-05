@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>大气六参数+VOCs走航监测系统V2.0</title>
+    <!-- Bootstrap Core CSS -->
+    <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-select/css/bootstrap-select.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bootstrap-datetimepicker/css/bootstrap-datetimepicker.min.css" rel="stylesheet">
+
+    <!-- MetisMenu CSS -->
+    <link href="../assets/vendor/metisMenu/metisMenu.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../assets/dist/css/sb-admin-2.css" rel="stylesheet">
+    <link href="../assets/dist/css/indexfor3d.css" rel="stylesheet">
+    <script src="../assets/dist/js/mqttws31.min.js"></script>
+    <script src="../assets/dist/js/store.js"></script>
+    <script type="text/javascript" src="../assets/dist/js/html2canvas.min.js"></script>
+    <script type="text/javascript" src="../assets/dist/js/canvas2image.js"></script>
+    <style>
+        .input-card {
+            width: 160px;
+            top: 40px;
+            right: 20px;
+            bottom: auto;
+        }
+    </style>
+</head>
+<body>
+<div style="width: 350px;font-size:20px;font-weight: bold;position: absolute;z-index: 99999;margin-left: 50%;left: -175px;padding: 10px">
+    大气六参数+VOCs走航监测系统V2.0
+</div>
+<div id="wrapper">
+    <div class="tab-content" style="position: absolute;z-index: 99999;bottom: 40px">
+        <div class="tab-pane active" style="margin-left: 10px">
+            <ul class="nav navbar-top-links">
+                <li>
+                    <button class="btn btn-default" data-toggle="modal" data-target="#voyageRecordsModal">
+                        <i class="glyphicon glyphicon-tasks"> 历史数据</i>
+                    </button>
+                </li>
+                <li>
+                    <button class="btn btn-success" data-toggle="modal" data-target="#controlModal">
+                        <i class="glyphicon glyphicon-paperclip"> 新建任务</i>
+                    </button>
+                </li>
+                <li>
+                    <button class="btn btn-default" data-toggle="modal" data-target="#DisplayModal">
+                        <i class="glyphicon glyphicon-cog"></i>
+                    </button>
+                </li>
+                <li>
+                    <button class="btn btn-default" id="sieaaa">
+                        隐藏实时值
+                    </button>
+                </li>
+                <li style="padding: 10px">
+                    <select id="selectHistoryTypes" class="form-control">
+                        <option value="TEMP">温度</option>
+                        <option value="HUMI">湿度</option>
+                        <option value="PM1_0">PM1</option>
+                        <option value="PM2_5">PM2.5</option>
+                        <option value="PM10">PM10</option>
+                        <option value="CO">CO</option>
+                        <option value="SO2">SO2</option>
+                        <option value="NO2">NO2</option>
+                        <option value="O3">O3</option>
+                        <option selected value="VOC">VOC</option>
+                    </select>
+                </li>
+                <li>
+                    <button id="btnHistoryDisplay" class="btn btn-default">
+                        <i class="glyphicon glyphicon-eye-open"></i>
+                    </button>
+                </li>
+                <li>
+                    <button onclick="convert2canvas()" class="btn btn-default">
+                        <i class="glyphicon glyphicon-download-alt"></i>
+                    </button>
+                </li>
+                <li>
+                    <button class="btn btn-success" data-toggle="modal" data-target="#showdevs">
+                        <!--                        id="cleardeic"-->
+                        选择设备<span id="deviceid"></span>
+                    </button>
+                </li>
+                <li>
+                    <!-- 2D/3D -->
+                    <button id="heightBtn" type="button" class="btn btn-default">3D</button>
+                </li>
+                <li>&nbsp;</li>
+                <li>&nbsp;</li>
+                <li>&nbsp;</li>
+                <li>&nbsp;</li>
+            </ul>
+
+        </div>
+    </div>
+
+    <div style="padding: 0;height: 100vh;">
+        <!--<div class="panel panel-default">-->
+        <!-- /.panel-heading -->
+        <div class="panel-body" style="padding: 0;height: 100vh;">
+            <div id="map_container" style="position:relative;height: 100vh;width: 100%">
+            </div>
+            <!--<canvas id="myCanvas" style="display: none;"></canvas>-->
+            <div class='input-card' id="shoushi">
+                <h5>地图类型</h5>
+                <div id="map-styles">
+                    <div class="input-item"><input type='radio' name='mapStyle' value='none'
+                                                   checked><span>高德地图</span></div>
+                    <div class="input-item"><input type='radio' name='mapStyle' value='y'><span>卫星影像</span></div>
+                    <!-- <div class="input-item"><input type='radio' name='mapStyle' value='p'><span>地形</span></div> -->
+                </div>
+                <div class="input-item"><input id="unitSwitch" type="checkbox" onchange="SwitchUnit()"><span>切换单位</span>
+                </div>
+                <div class="input-item"><input id="labelSwitch" type="checkbox"
+                                               onchange="SwitchLabel()"><span>显示数值</span></div>
+
+                <h5>测量实时值</h5>
+                <div id="realDatas-Panel">
+                </div>
+            </div>
+            <!-- 图例 -->
+            <div class="legend">
+                <ul class="colors" id="legend-color"></ul>
+                <ul class="labels" id="legend-label" style="padding: 0"></ul>
+            </div>
+        </div>
+        <!-- /.panel-body -->
+        <!--</div>-->
+        <!-- /.panel -->
+
+    </div>
+
+    <!-- voyageRecordsModal -->
+    <div class="modal fade" id="voyageRecordsModal" tabindex="-1" role="dialog"
+         aria-labelledby="voyageRecordsModalLabel" aria-hidden="true" data-backdrop="static">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <h2 class="modal-title" id="voyageRecordsModalLabel">巡航记录</h2>
+                </div>
+                <div class="modal-body">
+                    <form class="form-horizontal">
+                        <div class="form-group">
+                            <label for="startDatePicker" class="col-sm-2 control-label">开始时间</label>
+                            <div class='input-group date col-sm-8' id='startDatePicker'>
+                                <input style="height: 35px" type='text' class="form-control"/>
+                                <span class="input-group-addon">
+                                    <span class="glyphicon glyphicon-calendar"></span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="endDatePicker" class="col-sm-2 control-label">结束时间</label>
+                            <div class='input-group date col-sm-8' id='endDatePicker'>
+                                <input type='text' style="height: 35px" class="form-control"/>
+                                <span class="input-group-addon">
+                                    <span class="glyphicon glyphicon-calendar"></span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="timeMode" class="col-sm-2 control-label">时间模式</label>
+                            <select class="selectpicker" id="timeMode" onchange="SwitchMultiMode(this.selectedIndex)">
+                                <option value="single">单选</option>
+                                <option value="multi">多选</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <div class="col-sm-12">
+                                <div class="row" id="recordsList" style="padding: 10px"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="col-sm-offset-9 col-sm-2">
+                                <button type="button" class="btn btn-default" onclick="LoadData()">加载数据</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="controlModal" tabindex="-1" role="dialog" aria-labelledby="controlModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="controlModalLabel">新增巡航记录</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class='col-md-12'>
+                            <div class="form-group">
+                                <label for="recordName">巡航记录名称</label>
+                                <input type="text" class="form-control" id="recordName" aria-describedby="emailHelp"
+                                       placeholder="请输入巡航记录名称">
+                                <small id="nameHelp" class="form-text text-muted">尽量表意清晰，建议使用"地点+时间",方便后期检索</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class='col-md-12'>
+                            <div class="form-group">
+                                <label for="recordDesc">描述/备注</label>
+                                <input type="text" class="form-control" id="recordDesc" aria-describedby="emailHelp"
+                                       placeholder="请输入描述/备注">
+                                <small id="descHelp" class="form-text text-muted">可以输入此次巡航主要目标，用于备忘</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="startRecord" class="btn btn-primary">
+                            <i class="glyphicon glyphicon-play"> 开始新任务</i>
+                        </button>
+                        <button id="stopRecord" class="btn btn-secondary" disabled="disabled">
+                            <i class="glyphicon glyphicon-stop"> 结束任务</i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--    选择设备-->
+    <div class="modal fade" id="showdevs" tabindex="-1" role="dialog"
+         aria-labelledby="voyageRecordsModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">设备管理</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label for="devname">名称</label>
+                            <input type="text" style="height: 35px" class="form-control" id="devname"
+                                   placeholder="请输入设备名称">
+                        </div>
+                        <div class="form-group">
+                            <label for="devimei">IMEI号</label>
+                            <input type="text" style="height: 35px" class="form-control" id="devimei"
+                                   placeholder="请输入设备IMEI号">
+                        </div>
+                        <button id="adddev" class="btn btn-default">添加</button>
+                    </div>
+                    <div class="row" id="devs" style="padding: 10px">
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DisplayModal -->
+    <div class="modal fade" id="DisplayModal" tabindex="-1" role="dialog" aria-labelledby="DisplayModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="DisplayModalLabel">显示配置</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <!--<div class="col-md-6">
+                            监测因子
+                            <select id="selectTypes" class="form-control">
+                            </select>
+                        </div>-->
+                        <div class="col-md-4">
+                            放大倍数
+                            <select id="displayModes" class="form-control">
+                                <option value=1>*1</option>
+                                <option value=2>*2</option>
+                                <option value=5>*5</option>
+                                <option value=10>*10</option>
+                                <option value=20>*20</option>
+                                <option value=50>*50</option>
+                                <option value=100>*100</option>
+                                <option value=200>*200</option>
+                            </select>
+                        </div>
+                        <!--</div>
+                        <div class="row">-->
+                        <div class="col-md-4">
+                            均值数据
+                            <select id="avgModes" class="form-control">
+                                <option value=1>*1</option>
+                                <option value=2>*2</option>
+                                <option value=5>*5</option>
+                                <option value=10>*10</option>
+                                <option value=50>*50</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            修正因子
+                            <input type="text" style="height: 34px" class="form-control" id="modifyParam" value="1"/>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input id="labelContent" type="text" onkeydown="LabelContentInput(event)">
+</div>
+
+<script src="https://webapi.amap.com/maps?v=1.4.15&key=11ac181b08f1d2629a0b46978af78a46"></script>
+<script src="https://webapi.amap.com/loca?v=1.3.2&key=11ac181b08f1d2629a0b46978af78a46&dev=1"></script>
+<script type="text/javascript"
+        src="https://webapi.amap.com/maps?v=1.4.15&key=11ac181b08f1d2629a0b46978af78a46&plugin=AMap.MapType,AMap.Scale,AMap.OverView,AMap.ToolBar"></script>
+<!-- jQuery -->
+<script src="../assets/vendor/jquery/jquery.min.js"></script>
+
+<!-- Bootstrap Core JavaScript -->
+<script src="../assets/vendor/bootstrap/js/bootstrap.min.js"></script>
+<script src="../assets/vendor/bootstrap-select/js/bootstrap-select.min.js"></script>
+
+<script src="../assets/vendor/bootstrap-datetimepicker/js/bootstrap-datetimepicker.min.js"></script>
+
+<!-- Metis Menu Plugin JavaScript -->
+<script src="../assets/vendor/metisMenu/metisMenu.min.js"></script>
+
+<script src="../assets/vendor/leaflet/GeoMapUtil.js"></script>
+<!-- Custom Theme JavaScript -->
+<script src="../assets/dist/js/sb-admin-2.js"></script>
+<script src="../assets/dist/js/custom.js"></script>
+<!--<script src="../assets/dist/js/aerosoFunction.js"></script>
+<script src="../assets/dist/js/getColor.js"></script>-->
+<script src="../assets/dist/js/indexfor3d.js?radom=20"></script>
+<script src="../assets/dist/js/dataViewer.js?radom=20"></script>
+
+</body>
+</html>
+

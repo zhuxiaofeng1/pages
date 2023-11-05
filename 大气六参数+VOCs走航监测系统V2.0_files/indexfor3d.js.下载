@@ -1,0 +1,509 @@
+﻿var map;
+var viewMode = '3D';
+var displayMode;
+var height = 1000;
+var avgVal = 1;
+var modifyParam = 1;
+var scale, overView, satelliteLayer, terrainLayer;
+var infoWin;
+var tableDom;
+var cur_real_pid;
+var cur_real_rec_id;
+var real_gridLayer;
+var real_array = [];
+var cur_history_pid = "PM2_5SL";
+var cur_history_rec_id;
+var history_gridLayer;
+var dtE, dtS;
+var histrory_array = [];
+var auto;
+var isAcq;
+let mouseLnglat;
+var entryColumnCount = 0;
+
+
+$(function () {
+    //$('#myTab a:last').tab('show');
+
+    // $('#myTab a').click(function (e) {
+    //     e.preventDefault();
+    //     if (e.target.innerText == "实时控制") {
+    //         map.remove(history_gridLayer);
+    //         map.add(real_gridLayer);
+    //     }
+    //     else if (e.target.innerText == "数据浏览") {
+    //         map.add(history_gridLayer);
+    //         map.remove(real_gridLayer);
+    //     }
+    //     $(this).tab('show');
+    // })
+
+
+    map = new AMap.Map('map_container',
+        {
+            viewMode: '3D',
+            resizeEnable: true,
+            pitch: 70,
+            mapStyle: 'amap://styles/c71e0065c7cc964954ebf4957e3eed54'
+        });
+
+    AMap.plugin("AMap.Geocoder",function(){})
+    satelliteLayer = new AMap.TileLayer.Satellite({
+        // tileUrl: 'https://mt.google.cn/vt/lyrs=y@142&hl=zh-CN&gl=cn&x=[x]&y=[y]&z=[z]&s=Galil', // s=Galil不加也能渲染
+        zIndex: 2 // 在默认层级之上
+    });
+
+    terrainLayer = new AMap.TileLayer({
+        // tileUrl: 'https://mt.google.cn/vt/lyrs=p@142&hl=zh-CN&gl=cn&x=[x]&y=[y]&z=[z]&s=Galil', // s=Galil不加也能渲染
+        zIndex: 3 // 在默认层级之上
+    });
+
+    AMap.plugin([
+            'AMap.ControlBar',
+        ],
+        function () {
+            // 添加 3D 罗盘控制
+            map.addControl(new AMap.ControlBar(
+                {position: {top: '40px', left: '-50px'}}));
+            //map.addControl(new AMap.ControlBar());
+        });
+
+    scale = new AMap.Scale({
+        visible: true
+    }),
+        overView = new AMap.OverView({
+            visible: false
+        });
+    map.addControl(scale);
+    map.addControl(overView);
+
+    // CheckAcqState();
+    // GetAirParams();
+
+    displayMode = $("#displayModes").val();
+    modifyParam = $('#modifyParam').val();
+
+    $("#displayModes").on("change",
+        function () {
+            displayMode = $("#displayModes").val();
+
+            // real_gridLayer.setOptions({
+            //     style: {
+            //         height: [0, height * displayMode]
+            //     }
+            // });
+            //
+            // real_gridLayer.render();
+            // real_gridLayer.setFitView();
+
+            history_gridLayer.setOptions({
+                style: {
+                    height: [0, height * displayMode]
+                }
+            });
+
+            history_gridLayer.render();
+            history_gridLayer.setFitView();
+        });
+
+    $("#modifyParam").on('blur',
+        function () {
+            modifyParam = $('#modifyParam').val();
+        });
+
+    $("#avgModes").on("change",
+        function () {
+            avgVal = $("#avgModes").val();
+        });
+
+    //绑定radio点击事件
+    var radios = document.querySelectorAll("#map-styles input");
+    radios.forEach(function (ratio) {
+        ratio.onclick = setMapStyle;
+    });
+
+    function setMapStyle() {
+        if (this.value == 'none') {
+            map.remove(satelliteLayer);
+            map.remove(terrainLayer);
+        } else if (this.value == 'y') {
+            map.add(satelliteLayer);
+            map.remove(terrainLayer);
+        } else if (this.value == 'p') {
+            map.remove(satelliteLayer);
+            map.add(terrainLayer);
+        }
+    }
+
+    //创建右键菜单
+    let markerMenu = new AMap.ContextMenu();
+
+    markerMenu.addItem("添加标记", function (e) {
+        $('#labelContent').show();
+    }, 0);
+
+    map.on('click', function (e) {
+        $('#labelContent').hide();
+    })
+
+    map.on('rightclick', function (e) {
+        markerMenu.close();
+        markerMenu.open(map, e.lnglat);
+        mouseLnglat = e.lnglat;
+    })
+
+});
+
+function LabelContentInput(e) {
+    let evt = window.event || e;
+    if (evt.keyCode == 13) {
+        //回车事件
+        let marker = new AMap.Marker({
+            position: mouseLnglat,
+        });
+
+        let text = $('#labelContent').val();
+        marker.setLabel({
+            content: "<div class='info'>" + text + "</div>", //设置文本标注内容
+        });
+
+        marker.setMap(map);
+
+        $('#labelContent').hide();
+    }
+}
+
+
+//封装集合对象
+function ConvertToLayerSource(array) {
+    let points = [];
+    for (let i = 0; i < array.length; i++) {
+        let p = array[i];
+        if (p[cur_history_pid] !== 0) {
+            let value = unitSwitch ? p[cur_history_pid] : GetValueGB(p[cur_history_pid], cur_history_pid)
+            let lnglat = wgs84togcj02(p.E, p.N);
+            let id = p.id
+            let obj = {
+                coordinate: [lnglat[0], lnglat[1]],
+                //value: cur_history_pid == 'CO' ? (value * modifyParam).toFixed(1) : Math.floor(value * modifyParam),
+                value: value.toFixed(2),
+                id:id,
+                limit: array.length,
+            }
+
+            points.push(obj);
+        }
+    }
+    // var points = array.map(function (p) {
+    //     var lnglat = wgs84togcj02(p.E, p.N);
+    //     return {
+    //         coordinate: [lnglat[0], lnglat[1]],
+    //         value: Math.floor(p[cur_history_pid] * modifyParam),
+    //         limit: array.length,
+    //     };
+    // });
+
+    var convertedPoint = [];
+    var sumVal = 0;
+    var avgLat = 0;
+    var avgLng = 0;
+    var totalLat = 0;
+    var totalLng = 0;
+    var totalCount = 0;
+    var maxLimit = 0;
+    points.forEach((item, index) => {
+        if (item.coordinate[0] != null || item.coordinate[1] != null) {
+          
+            maxLimit = item.limit;
+            if (index == 0) {
+                avgLng = item.coordinate[0];
+                avgLat = item.coordinate[1];
+                sumVal = item.value;
+            } else if ((index + 1) % avgVal == 0) {
+                var val;
+                if (maxLimit != null) {
+                    if (sumVal / avgVal > maxLimit)
+                        val = maxLimit;
+                    else
+                        val = sumVal / avgVal;
+                } else
+                    val = sumVal / avgVal;
+
+                //convertedPoint.push({ coordinate: [avgLng, avgLat].join(","), value: val });
+                convertedPoint.push({coordinate: [avgLng, avgLat], value: val,id:item.id });
+                avgLng = item.coordinate[0];
+                avgLat = item.coordinate[1];
+                sumVal = item.value;
+            } else {
+                sumVal += item.value;
+            }
+
+            totalLat += item.coordinate[1];
+            totalLng += item.coordinate[0];
+            totalCount++;
+           
+            //convertedPoint.push({coordinate: [item.coordinate[0], item.coordinate[1]], value: item.value,id:item.id });
+        }
+    });
+
+
+    //let avg = sum / values.length;
+
+    //convertedPoint.push({ coordinate: [111,37], value: 0 });
+    // convertedPoint.push({ coordinate: [totalLng / totalCount, totalLat / totalCount], value: 0 });
+    //convertedPoint.push({ coordinate: [totalLng / totalCount, totalLat / totalCount], value: maxLimit });
+    return convertedPoint;
+}
+
+function initPointAdcode(points, layer) {
+    layer.setData(points, {
+        lnglat: 'coordinate',
+        value: 'value'
+    });
+
+    layer.setOptions({
+        unit: 'px',
+        mode: 'max',
+        light: {
+            // 环境光
+            ambient: {
+                // 光照颜色
+                color: '#ffffff',
+                // 光照强度，范围 [0, 1]
+                intensity: 0.7
+            },
+            // 平行光
+            directional: {
+                color: '#ffffff',
+                // 光照方向，是指从地面原点起，光指向的方向。
+                // 数组分别表示 X 轴、Y 轴、Z 轴。
+                // 其中 X 正向朝东、Y 正向朝南、Z 正向朝地下。
+                direction: [0, -1, 0.6],
+                intensity: 0.7
+            }
+        },
+        style: {
+            opacity: 1,
+            //radius: 20 * avgVal, // 网格热力半径，单位：米
+            radius: 12, // 网格热力半径，单位：像素
+            gap: 1, // 网格间距，单位：米
+            //height: [0, 0],
+            height: [0, height * displayMode],
+            color: {
+                //scale: 'quantize',
+                //value: ['green', 'yellow', 'orange', 'red', 'purple', 'maroon'],
+                value: ['blue', 'yellow', 'orange', 'red'],
+            },
+            text: {
+                content: bShowLabel ? function (v) {
+                    return v.value.max;
+                } : "",
+                direction: 'center', // 文字方位
+                //offset: [2, -5],  // 偏移大小
+                fontSize: 12, // 文字大小
+                fillColor: '#03101F',
+                strokeColor: '#ffffff', // 文字描边颜色
+                strokeWidth: 0, // 文字描边宽度
+            }
+        },
+        selectStyle: {
+            opacity: 1,
+            radius: 30,
+            color: 'black'
+        },
+    });
+    layer.render();
+
+    // 事件 legendupdate: 图例数据更新完成回调此函数
+    layer.on('legendupdate',
+        function (ev) {
+
+
+            var colorLegend = ev.colorLegend;
+
+            var legends = colorLegend.map(item => {
+                // color 为 gradient 传入的格式
+                return `<li class="color-item" style="background-color: ${item.color};display:block;width: 30px;"></li>`
+            });
+
+            var ranges = colorLegend.map((item, index) => {
+                // range 可能为小数，可以自行取整计算
+                item.range[0] = formatNum(item.range[0], 2);
+                item.range[1] = formatNum(item.range[1], 2);
+
+                if (index == colorLegend.length - 1) {
+                    return `<li class="label-item" style="display: block;font-size: 13px;text-align: left;">${item.range[0]}  g/m<sup>2</sup></li><li class="label-item" style="display: block;font-size: 13px;text-align: left;">${item.range[1]} g/m<sup>2</sup></li>`;
+                }
+                return `<li class="label-item" style="display: block;font-size: 13px;text-align: left;">${item.range[0]} g/m<sup>2</sup></li>`;
+            });
+
+
+            document.getElementById('legend-color').innerHTML = legends.join('');
+            document.getElementById('legend-label').innerHTML = ranges.join('');
+
+        });
+
+    layer.on('mousemove',
+        (ev) => {
+            var values = ev.rawData.map(function (d) {
+                return d.value;
+            });
+
+            openInfoWin(map,
+                ev.originalEvent,
+                {
+                    '位置': formatNum(ev.rawData[0].coordinate[1], 4) + ',' + formatNum(ev.rawData[0].coordinate[0], 4),
+                    '数值': Math.max.apply(null, values)
+                });
+        });
+
+    layer.on('mouseleave',
+        function (ev) {
+            closeInfoWin();
+        });
+   layer.on('click',
+        (ev) => {
+            var values = ev.rawData.map(function (d) {
+                return d.value;
+            });
+            console.log('ev:'+JSON.stringify(ev.rawData[0]));
+            console.log('id:'+JSON.stringify(ev.rawData[0].id));
+            /*
+            console.log('ev:'+JSON.stringify(ev.rawData[0]));
+            console.log('id:'+JSON.stringify(ev.rawData[0].id));
+            //firstSelect++;
+            entryColumnCount++;
+             console.log('entryColumnCount:'+entryColumnCount);
+            console.log('selectCount:'+ev.rawData.length);
+            if(ev.rawData.length > 1){
+                //console.log('firstSelect:'+firstSelect);
+                console.log('selectCount:'+ev.rawData.length);
+                if(entryColumnCount == ev.rawData.length){
+                    alert("您选中了"+ev.rawData.length+ "个数据，请缩小地图显示范围再选中。");
+                    entryColumnCount = 0;
+                }
+                
+            }else{
+                if(confirm('是否删除该记录?') == true ){
+                    // /iot/uavdata/uAVData/delete?ids=ev.rawData[0].id;
+                    $.ajax({
+                        url: 'http://8.130.119.214:8082/iot/uavdata/uAVData/delete?ids=' + ev.rawData[0].id,
+                        type: 'DELETE',
+                        success: function (result) {
+                            console.log(result);
+                            LoadData();
+                        }
+                    });
+                    
+                    
+                }else{
+
+                }
+                
+                
+            }*/
+            /*
+                var lnglat = ev.rawData[0].coordinate;
+                var geocoder = new AMap.Geocoder({
+
+                    extensions:'all',
+
+                    radius: 200 //范围，默认：500
+
+                });
+            geocoder.getAddress(lnglat, function(status, result) {
+
+                if (status === 'complete'&&result.regeocode) {
+
+                console.log(JSON.stringify(result.regeocode.roads))
+
+                    var address = result.regeocode.formattedAddress;
+
+
+                }else{
+
+                    console.log('根据经纬度查询地址失败')
+
+                }
+
+            });
+             */
+        });
+       
+};
+
+function openInfoWin(map, event, content) {
+    if (!infoWin) {
+        infoWin = new AMap.InfoWindow({
+            isCustom: true, //使用自定义窗体
+            offset: new AMap.Pixel(120, 100)
+        });
+    }
+
+    var x = event.offsetX;
+    var y = event.offsetY;
+    var lngLat = map.containerToLngLat(new AMap.Pixel(x, y));
+
+    if (!tableDom) {
+        let infoDom = document.createElement('div');
+        infoDom.className = 'info';
+        tableDom = document.createElement('table');
+        infoDom.appendChild(tableDom);
+        infoWin.setContent(infoDom);
+    }
+
+    var trStr = '';
+    for (var name in content) {
+        var val = content[name];
+        trStr +=
+            '<tr>' +
+            '<td class="label">' +
+            name +
+            '</td>' +
+            '<td>&nbsp;</td>' +
+            '<td class="content">' +
+            val +
+            '</td>' +
+            '</tr>'
+    }
+
+    tableDom.innerHTML = trStr;
+    infoWin.open(map, lngLat);
+}
+
+function closeInfoWin() {
+    if (infoWin) {
+        infoWin.close();
+    }
+}
+
+function toggleScale(checkbox) {
+    if (checkbox.checked) {
+        scale.show();
+    } else {
+        scale.hide();
+    }
+}
+
+function toggleOverViewShow(checkbox) {
+    if (checkbox.checked) {
+        overView.show();
+        document.getElementById('overviewOpen').disabled = false;
+    } else {
+        overView.hide();
+        document.getElementById('overviewOpen').disabled = true;
+    }
+}
+
+function toggleOverViewOpen(checkbox) {
+    if (checkbox.checked) {
+        overView.open();
+    } else {
+        overView.close();
+    }
+}
+
+function formatNum(num, idx) {
+    return Math.round(num * Math.pow(10, idx)) / Math.pow(10, idx);
+}
+

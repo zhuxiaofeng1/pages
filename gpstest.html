@@ -1,0 +1,17 @@
+<html>
+    <head>gps test</head>
+    <script src="./大气六参数+VOCs走航监测系统V2.0_files/GeoMapUtil.js.下载"></script>
+    <script src="./大气六参数+VOCs走航监测系统V2.0_files/jquery.min.js.下载"></script>
+    
+    <body>
+        <h1>gps test</h1>
+    </body>
+    <script>
+        $(function () {
+            //"11224.4992,3438.1633"
+            console.log('hello');
+            let x = NMEA01843ToWGS84(11224.4992,3438.1633);
+            console.log('lat:'+x)
+        });
+    </script>
+</html>

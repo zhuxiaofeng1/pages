@@ -1,0 +1,1031 @@
+﻿var parameteraa = 3000;
+var parameterbb = 0.7752;
+var parametercc = 1.8613;
+var newtask = false;
+var isSortRoad = false;
+//当前运行的任务id
+var taskid = "";
+function stoptask() {
+            $("#startRecord").attr('disabled', false);
+            //$("#pauseRecord").attr('disabled', true);
+            $("#stopRecord").attr('disabled', true);
+			let msg = {"orgcode": "", "deviceid": deviceid, "title": name, "taskid": taskid, "id":id};
+			let message = new Paho.MQTT.Message(JSON.stringify(msg));
+			message.destinationName = "StopTask2" + "/" + deviceid;
+			console.log(message.destinationName);
+			window.mqttclient.send(message);
+            //取消订阅
+            //window.mqttclient.unsubscribe(topicre + "/" + deviceid);
+            var subtopicshort = topicre + "/" + deviceid;
+            var subtopic = topicre + "/" + deviceid+"/+";
+            window.mqttclient.unsubscribe(subtopicshort);
+            window.mqttclient.unsubscribe(subtopic);
+            console.log("current subtopic unsubscribe:"+subtopicshort);
+            console.log("history subtopic unsubscribe:"+subtopic);
+            document.getElementById('realDatas-Panel').innerHTML = "";
+            $('#controlModal').modal('hide')
+            console.log("任务已经结束!")
+    }
+$(function () {
+    var storeparameteraa = store.get('parameteraa');
+    if(storeparameteraa){
+         $('#parameteraa').val(storeparameteraa);
+         parameteraa = storeparameteraa;
+    }else{
+        parameteraa = 3000;
+        store.set('parameteraa', parameteraa);
+    }
+
+    var storeparameterbb = store.get('parameterbb');
+    if(storeparameterbb){
+         $('#parameterbb').val(storeparameterbb);
+          parameterbb = storeparameterbb;
+    }else{
+        parameterbb = 0.7752;
+        store.set('parameterbb', parameterbb);
+    }
+
+     var storeparametercc = store.get('parametercc');
+    if(storeparametercc){
+         $('#parametercc').val(storeparametercc);
+          parametercc = storeparametercc;
+    }else{
+        parametercc = 1.8613;
+        store.set('parametercc', parametercc);
+    }
+
+   
+    $('#setparameter').on('click',function(){
+        parameteraa = $('#parameteraa').val();
+        parameterbb = $('#parameterbb').val();
+        parametercc = $('#parametercc').val();
+        store.set('parameteraa', parameteraa);
+        store.set('parameterbb', parameterbb);
+        store.set('parametercc', parametercc);
+    });
+    history_gridLayer = new Loca.GridLayer({
+        //visible: true,
+        fitView: true,
+        eventSupport: true
+    });
+    map.add(history_gridLayer);
+    cur_history_pid = $("#selectHistoryTypes").val();
+    console.log('cur_history_pid:'+cur_history_pid);
+    $("#selectHistoryTypes").on("change",
+        function () {
+            cur_history_pid = $("#selectHistoryTypes").val();
+            console.log(cur_history_pid)
+            DisplayHistoryData()
+        });
+
+    $("#btnHistoryDisplay").on("click",
+        function () {
+            DisplayHistoryData();
+        });
+
+    $('#startDatePicker').datetimepicker({
+        language: "zh-CN",
+        autoclose: true, //选中之后自动隐藏日期选择框
+        clearBtn: false, //清除按钮
+        todayBtn: true, //今日按钮
+        format: "yyyy-mm-dd", //日期格式
+        minView: "month", //选择日期后，不会再跳转去选择时分秒
+    }).on('changeDate', function (ev) {
+        dtS = $("#startDatePicker").find("input").val();
+        dtE = $("#endDatePicker").find("input").val();
+        GetRecordList();
+    });
+
+    $('#endDatePicker').datetimepicker({
+        language: "zh-CN",
+        autoclose: true, //选中之后自动隐藏日期选择框
+        clearBtn: false, //清除按钮
+        todayBtn: true, //今日按钮
+        format: "yyyy-mm-dd", //日期格式
+        minView: "month", //选择日期后，不会再跳转去选择时分秒
+    }).on('changeDate', function (ev) {
+        dtS = $("#startDatePicker").find("input").val();
+        dtE = $("#endDatePicker").find("input").val();
+        GetRecordList();
+    });
+
+    $(document).on('change', 'input:radio[id^="q_op_"]', function (event) {
+        cur_history_rec_id = parseInt(this.id.slice(5, this.id.length));
+        $('#historyRecordLabel').html(this.parentNode.innerText);
+    });
+
+    onHeight();
+    
+    //开始实时监测
+    $("#startRecord").on("click",
+        function () {
+            let name = $("#recordName").val();
+            let desc = $("#recordDesc").val();
+            if (name != "") {
+                let msg = {"orgcode": "", "deviceid": deviceid, "title": name, "rmark": desc};
+                let message = new Paho.MQTT.Message(JSON.stringify(msg));
+                message.destinationName = createuav + "/" + deviceid;
+				console.log(message.destinationName);
+                window.mqttclient.send(message);
+                $("#startRecord").attr('disabled', true);
+                //$("#pauseRecord").attr('disabled', false);
+                $("#stopRecord").attr('disabled', false);
+				var subtopic = topicre + "/" + deviceid +"/+";
+                window.mqttclient.subscribe(subtopic);
+                console.log("订阅：" + subtopic );
+                $('#controlModal').modal('hide')
+                newtask = true;
+            }
+
+        });
+    
+    //停止实时监测
+    $("#stopRecord").on("click",stoptask);
+    //删除设备id
+    $("#cleardeic").click(function () {
+        store.remove('deviceid');
+        window.location.reload();
+    })
+    //添加设备
+    $("#adddev").click(function () {
+        let devname = $("#devname").val();
+        let devimei = $("#devimei").val();
+        if ($.trim(devname) == "") {
+            return alert("请输入设备名称");
+        }
+        if ($.trim(devimei) == "") {
+            return alert("请输入设备IMEI号");
+        }
+        //更新数据添加设备
+        deviceidlsit.push({
+            name: devname,
+            deviceid: devimei,
+            idselect: false
+        })
+        store.set('deviceid', JSON.stringify(deviceidlsit));
+        //更新显示
+        updatedevs();
+    })
+
+    $("#sieaaa").click(function () {
+        if (showwindosf) {
+            showwindosf = false;
+            $("#shoushi").hide();
+            $("#sieaaa").text("显示实时值")
+        } else {
+            showwindosf = true;
+            $("#shoushi").show();
+            $("#sieaaa").text("隐藏实时值")
+        }
+
+    })
+});
+var showwindosf = true;
+Date.prototype.format = function (fmt) {
+    var o = {
+        "M+": this.getMonth() + 1, //月份
+        "d+": this.getDate(), //日
+        "h+": this.getHours(), //小时
+        "m+": this.getMinutes(), //分
+        "s+": this.getSeconds(), //秒
+        "q+": Math.floor((this.getMonth() + 3) / 3), //季度
+        "S": this.getMilliseconds() //毫秒
+    };
+    if (/(y+)/.test(fmt)) {
+        fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+    }
+    for (var k in o) {
+        if (new RegExp("(" + k + ")").test(fmt)) {
+            fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+        }
+    }
+    return fmt;
+}
+
+//截图
+function convert2canvas() {
+    var cntElem = document.getElementsByClassName("amap-maps")[0];
+    var shareContent = cntElem; //需要截图的包裹的（原生的）DOM 对象
+    var width = shareContent.offsetWidth; //获取dom 宽度
+    var height = shareContent.offsetHeight; //获取dom 高度
+    var canvas = document.createElement("canvas"); //创建一个canvas节点
+    var scale = 1; //定义任意放大倍数 支持小数
+    canvas.width = width * scale; //定义canvas 宽度 * 缩放
+    canvas.height = height * scale; //定义canvas高度 *缩放
+    canvas.getContext("2d").scale(scale, scale); //获取context,设置scale
+    var opts = {
+        scale: scale, // 添加的scale 参数
+        canvas: canvas, //自定义 canvas
+        //logging: true, //日志开关，便于查看html2canvas的内部执行流程
+        width: width, //dom 原始宽度
+        height: height,
+        useCORS: true // 【重要】开启跨域配置
+    };
+    html2canvas(shareContent, opts).then(function (canvas) {
+
+        let context = canvas.getContext('2d');
+        // 【重要】关闭抗锯齿
+        context.mozImageSmoothingEnabled = false;
+        context.webkitImageSmoothingEnabled = false;
+        context.msImageSmoothingEnabled = false;
+        context.imageSmoothingEnabled = false;
+
+        // 【重要】默认转化的格式为png,也可设置为其他格式
+        let img = Canvas2Image.convertToJPEG(canvas, canvas.width, canvas.height);
+        console.log(img.src)
+        // // 创建a链接
+        let a = document.createElement('a');
+        a.href = img.src
+        a.download = '微站可视化数据效果图.jpeg'
+        // 触发a链接点击事件，浏览器开始下载文件
+        a.click()
+
+    });
+}
+function fomatFloat(src,pos){    
+             return Math.round(src*Math.pow(10, pos))/Math.pow(10, pos);    
+} 
+//小眼睛刷新数据
+
+function calculatSl(pmvalue,speedvalue){
+    var slIn = fomatFloat(parameteraa*Math.pow(pmvalue*1.0/1000,parameterbb)*Math.pow(speedvalue,-parametercc),3 );
+    if(slIn > 1.2){
+        slIn = 1.2;
+    }
+    return slIn;
+}
+
+function DisplayHistoryData() {
+    if (shishlist.length > 0) {
+		//shishlist = [];
+			//console.log('my modify shuju'+JSON.stringify(shishlist));
+            //let myset = new Set();
+        var myMap = new Map();
+        var preSPEED = 0;
+        var prePreSPEED = 0;
+        var preSl = 0;
+        var prePreSl = 0;
+        var multiple = 2;
+        var speedSubValue = 10;
+        shishlist.forEach((item,index) => {
+
+
+            //console.log("item: "+JSON.stringify(item)+" index:"+index)
+            var sltemp;
+           
+            if(cur_history_pid === 'PM2_5SL'){
+                //sltemp = fomatFloat(parameteraa*Math.pow(item["PM2_5"]*1.0/1000,parameterbb)*Math.pow(item["SPEED"],-parametercc) ,3 );
+                sltemp = calculatSl(item["PM2_5"],item["SPEED"]);
+                item.PM2_5SL = sltemp;
+            }
+            if(cur_history_pid === 'PM10SL'){
+               sltemp = calculatSl(item["PM10"],item["SPEED"]);
+               item.PM10SL = sltemp;
+            }
+            if(cur_history_pid === 'PM100SL'){
+                sltemp = calculatSl(item["PM100"],item["SPEED"]);
+                item.PM100SL = sltemp;
+            }
+            
+            if(isSortRoad){
+               var geocoder = new AMap.Geocoder({
+                        extensions:'all',
+                        radius: 200 //范围，默认：500
+                    });
+                var lnglat = [item["E"],item["N"]];
+                geocoder.getAddress(lnglat, function(status, result) {
+                    if (status === 'complete'&&result.regeocode) {
+                        console.log(JSON.stringify(result.regeocode.roads))
+                        var address = result.regeocode.formattedAddress;
+                        
+                        if(result && result.regeocode && result.regeocode[0] && result.regeocode.roads[0].name){
+                            item.name = result.regeocode.roads[0].name
+                        }else{
+                            item.name = "未知";
+                        }  
+                        console.log('road name:'+item.name);
+                    }else{
+                        console.log('根据经纬度查询地址失败')
+                        item.name = "未知";
+                        console.log('road name:'+item.name);
+                    }
+                });
+           
+            }
+            // sl redo
+            /*
+            if(index>2){
+                prePreSPEED = shishlist[index-2].SPEED;
+                if(prePreSPEED > 0){
+                    if(shishlist[index].SPEED - speedSubValue > -speedSubValue){
+                        if(cur_history_pid === 'PM2_5SL'){     
+                            prePreSl = shishlist[index-2].PM2_5SL;    
+                            if(sltemp > prePreSl*multiple){
+                                item.PM2_5SL = prePreSl;
+                            } 
+                        }
+                        if(cur_history_pid === 'PM10SL'){                           
+                            prePreSl = shishlist[index-2].PM10SL;    
+                            if(sltemp > prePreSl*multiple){
+                                item.PM10SL = prePreSl;
+                            } 
+                        }
+                        if(cur_history_pid === 'PM100SL'){                                              
+                            prePreSl = shishlist[index-2].PM100SL;    
+                            if(sltemp > prePreSl*multiple){
+                                item.PM100SL = prePreSl;
+                            } 
+                        }
+                    }
+                }
+            }
+            */
+            
+            //console.log(sltemp);
+           
+            
+            
+            
+
+
+            
+            if(myMap.has(item.name)){
+                var obj = myMap.get(item.name);
+                if(cur_history_pid === 'PM2_5SL'){
+                    //console.log('compute avg with pm25 sl');
+                    obj.sltempsum +=  item.PM2_5SL;
+                }
+                if(cur_history_pid === 'PM10SL'){
+                    //console.log('compute avg with pm10 sl');
+                    obj.sltempsum +=  item.PM10SL;
+                }
+                if(cur_history_pid === 'PM100SL'){
+                    //console.log('compute avg with pm100 sl');
+                    obj.sltempsum +=  item.PM100SL;
+                }
+                obj.count += 1;
+                
+                myMap.set(item.name,obj);
+                //console.log('true');
+            }else{
+                var obj = {'sltempsum':0,'count':0};
+                obj.count = 1;
+                myMap.set(item.name,obj);
+                //console.log('false');
+                //console.log(item.name);stort
+            }
+        });
+            
+           
+        $('#topgunul li').remove();    
+        //store.remove('sortMap');
+        store.remove('roads');
+        store.remove('values');
+        myMap.forEach((value, key) => {
+            value.avg = value.sltempsum/value.count;
+            //console.log('map:'+key + ' : ' + value.sltempsum +' '+ value.count +' '+value.sltempsum/value.count);
+            
+        });
+        sortMap = new Map([...myMap].sort((a, b) => b[1].avg - a[1].avg));
+        //store.set('sortMap',sortMap);
+        var roads = new Array();
+        var values = new Array();
+        sortMap.forEach((value, key) => {
+            roads.push(key);
+            values.push(value.avg+'');
+            //$('#topgunul').append('<li>'+ key +' ' + value.avg +'</li>');
+        });
+        roads = roads.reverse();
+        values = values.reverse();
+        store.set("roads",roads);
+        store.set("values",values);
+        console.log('roads:'+roads);
+        console.log('values:'+values);
+        let convertedPoint = ConvertToLayerSource(shishlist);
+        console.log('displayMode'+displayMode);
+        initPointAdcode(convertedPoint, history_gridLayer);
+        history_gridLayer.setFitView();
+    }
+}
+
+//高度切换
+function onHeight() {
+    var heightBtn = document.querySelector('#heightBtn');
+
+    heightBtn.onclick = function () {
+        viewMode = viewMode === '2D' ? '3D' : '2D';
+        heightBtn.innerHTML = viewMode;
+        if (viewMode === '2D') {
+            map.setPitch(0);
+            history_gridLayer.setOptions({
+                style: {
+                    height: [0, 0]
+                }
+            });
+        } else {
+            map.setPitch(75);
+            history_gridLayer.setOptions({
+                style: {
+                    height: [0, height * displayMode],
+                }
+            });
+        }
+
+        history_gridLayer.render();
+        history_gridLayer.setFitView();
+    }
+}
+
+//选择时间获取任务列表
+function GetRecordList() {
+    if (dtS != null && dtS != "" && dtE != null && dtE != "") {
+        //微站任务列表数据
+        ws.send(JSON.stringify({
+            cmd: "UAVDATAT", //DATAT:获取雷达任务列表
+            deviceID: deviceid,
+            params: {
+                type: 'S',
+                starttime: dtS + " 00:00:00",
+                endtime: dtE + " 23:59:59",
+                page: 1,
+                limit: 9999
+            }
+        }));
+    }
+}
+
+let currentTaskId = '';
+
+//获取任务输数据
+function gethistry(mytaskid) {
+    currentTaskId = mytaskid;
+    //结束实时
+    //取消订阅
+    //window.mqttclient.unsubscribe(topicre + "/" + deviceid);
+    var subtopicshort = topicre + "/" + deviceid;
+    var subtopic = topicre + "/" + deviceid+"/+";
+    window.mqttclient.unsubscribe(subtopicshort);
+    window.mqttclient.unsubscribe(subtopic);
+    console.log("current subtopic unsubscribe:"+subtopicshort);
+    console.log("history subtopic unsubscribe:"+subtopic);
+    //清空界面数据
+    if (!bShowMulti) {
+        shishlist = [];
+        $('#voyageRecordsModal').modal('hide')
+    }
+    //获取微站
+    ws.send(JSON.stringify({
+        cmd: "UAVDATA",
+        deviceID: deviceid,
+        params: {
+            type: 'S',
+            page: 1,
+            limit: 86400,
+            taskid: mytaskid,
+        }
+    }));
+}
+
+//=====================================WEBSOCKET服务连接操作====================================================
+//连接服务器
+var wsImpl = window.WebSocket || window.MozWebSocket;
+//微站设备ID
+var deviceid;
+var deviceidlsit;
+var selectdev;
+if (store.get('deviceid')) {
+    deviceidlsit = JSON.parse(store.get('deviceid'));
+    for (var i = 0; i < deviceidlsit.length; i++) {
+        if (deviceidlsit[i].idselect) {
+            selectdev = deviceidlsit[i];
+            deviceid = selectdev.deviceid;
+            break;
+        }
+    }
+} else {
+    deviceid = prompt("请输入微站设备IMEI编号", "")
+    selectdev = {
+        name: prompt("请输入微站名称", "未命名"),
+        deviceid: deviceid,
+        idselect: true
+    }
+    deviceidlsit = [
+        selectdev
+    ]
+
+    store.set('deviceid', JSON.stringify(deviceidlsit));
+}
+
+updatedevs();
+$("#deviceid").text(":" + selectdev.name);
+//mqtt服务ip
+//var mqttip = "123.57.84.71";
+//var mqttip = "hjkl.cn";
+var mqttip = "39.99.143.2";
+//微站服务地址
+//var wspath = "ws://123.57.84.71:50000/";
+//var wspath = "ws://localhost:50000/";
+//var wspath = "ws://hjkl.cn:50000/";
+var wspath = "ws://8.130.119.214:50000/";
+//微站接收主题
+var topicre = "PlaneStation2";
+//微站创建任务主题
+var createuav = "CreateNewTask2";
+
+var id = "";
+//实时数据id
+var uavid = "";
+//实时数据已有条数
+var countnumber = 0;
+//实时集合
+var shishlist = [];
+// create a new websocket and connect
+window.ws = new wsImpl(wspath);
+// when data is comming from the server, this metod is called
+ws.onmessage = function (evt) {
+    console.log('ws onmessage', evt.data)
+    var info = JSON.parse(evt.data)
+    console.log('ws local deviceid:'+deviceid);
+    console.log('ws remote deviceid:'+info.deviceid);
+    if(deviceid == info.deviceid){
+        console.log('ok!ws local deviceid can match remote deviceid');
+
+        if (info.cmd == "UAVDATAT") {
+            //获取无人机微站列表
+            $("#recordsList").html("");
+            let content = `<ul class="list-group">`
+            if (bShowMulti) {
+                for (let i = 0; i < info.list.length; i++) {
+                    let item = info.list[i];
+                    content += `<li class="list-group-item"><input type="checkbox" onchange="SelectTask(this.getAttribute('value'), this.checked)" value="${item.taskid}" unchecked>任务名：<b>${item.title}</b><br/>任务时间：<b>${item.starttime} ~ ${item.endtime}</b></li>`
+                }
+            } else {
+                for (let i = 0; i < info.list.length; i++) {
+                    let item = info.list[i];
+                    content += `<li class="list-group-item"><input type="radio" name="taskRadio" onclick="SelectTask(this.getAttribute('value'))" value="${item.taskid}">任务名：<b>${item.title}</b><br/>任务时间：<b>${item.starttime} ~ ${item.endtime}</b></li>`
+                }
+            }
+
+            content += '</ul>'
+            $("#recordsList").append(content)
+        } else if (info.cmd == "GETUAVTASKID") {
+            //获取最新的任务id
+            
+            console.log('onmessage', evt.data)
+            taskid = info.uavtask.taskid;
+            id = info.uavtask.id;
+            taskid = info.uavtask.id;
+            countnumber = info.countnumber;
+            if (taskid != null && taskid != "") {
+                console.log("有正在运行的任务,taskid="+taskid);
+                console.log("订阅11111：" + topicre + "/" + deviceid);
+                var subtopicshort = topicre + "/" + deviceid;
+                var subtopic = topicre + "/" + deviceid+"/+";
+                window.mqttclient.subscribe(subtopicshort);
+                window.mqttclient.subscribe(subtopic);
+                console.log("current subtopic:"+subtopicshort);
+                console.log("history subtopic:"+subtopic);
+                //window.mqttclient.subscribe(topicre + "/" + deviceid);
+                //console.log("订阅：" + topicre + "/" + deviceid);
+                if(newtask){
+                    
+                }else{
+                    if(confirm("有正在运行的任务，是否结束该任务?") == true){
+                        stoptask();
+                        
+                        
+                    }else{
+
+                    }
+                }
+                
+            }else{
+                console.log("没有有正在运行的任务");
+            }
+
+        } else if (info.cmd == "UAVDATA") {
+            //添加无人机微站实体
+            if (info.list.length == 0) {
+                return
+            }
+
+            uavid = info.list[0].id
+            shishlist = info.list.reverse();
+            console.log('shishlist length:'+shishlist.length);
+            DisplayHistoryData()
+        } else {
+            console.log(info)
+        }
+
+
+    }else{
+        console.log('ws local deviceid can not match remote deviceid');
+    }
+
+    
+
+};
+ws.onopen = function () {
+    //启动MQTT
+    startMqtt();
+    console.log("服务连接成功")
+};
+
+// when the connection is closed, this method is called
+ws.onclose = function () {
+    console.log("服务连接断开");
+}
+//=================================MQTT服务连接==============================================
+//启动MQTT服务
+function startMqtt() {
+    var now = new Date();
+    var numbers = now.getMilliseconds();
+
+    console.log("正在建立MQTT服务器连接 ...");
+    // 创建一个MQTT客户端连接
+    window.mqttclient = new Paho.MQTT.Client(mqttip, 8083, 'paho-js-' + numbers);
+    //设置回调函数
+    mqttclient.onConnectionLost = onConnectionLost;
+    mqttclient.onMessageArrived = onMessageArrived;
+    // 连接客户端
+    mqttclient.connect(
+        {
+            cleanSession: true,
+            timeout: 10,//连接超时时间
+            keepAliveInterval: 10,//心跳间隔
+            onSuccess: onConnect,
+            reconnect : false
+
+        
+        }
+    );
+}
+
+
+// 连接成功时调用
+function onConnect() {
+    // 订阅主题
+    //window.mqttclient.subscribe("PlaneStation2/866714040061458");
+    console.log("MQTT服务器连接成功");
+    // message = new Paho.MQTT.Message("Hello");
+    // message.destinationName = "World";
+    // client.send(message);
+    //获取最新的任务id
+    ws.send(JSON.stringify({
+        cmd: "GETUAVTASKID",
+        deviceID: deviceid,
+        taskid: taskid,
+        params: {}
+    }));
+}
+
+//选择客户端
+function selecdev(infos, index) {
+    selectdev = deviceidlsit[index];
+    deviceid = infos.deviceid;
+    $("#deviceid").text(":" + selectdev.name);
+    let newlist = [];
+    for (var i = 0; i < deviceidlsit.length; i++) {
+        if (index == i) {
+            deviceidlsit[i].idselect = true
+        } else {
+            deviceidlsit[i].idselect = false
+        }
+        newlist.push({
+            ...deviceidlsit[i]
+        })
+    }
+    store.set('deviceid', JSON.stringify(deviceidlsit));
+    window.location.reload();
+}
+
+//更新显示设备列表
+function updatedevs() {
+    $("#devs").html("");
+    for (let i = 0; i < deviceidlsit.length; i++) {
+        let infos = deviceidlsit[i];
+        $("#devs").append('<br/><label onclick=\'selecdev(' + JSON.stringify(infos) + ',' + i + ')\' class="btn btn-default">' + infos.name + '[' + infos.deviceid + ']</label>');
+    }
+}
+
+// 当客户端失去连接时调用
+function onConnectionLost(responseObject) {
+    if (responseObject.errorCode !== 0) {
+        console.log("onConnectionLost:" + responseObject.errorMessage);
+    }
+    console.log("MQTT服务器连接断开");
+    //alert("网络断开连接");
+}
+
+function uuid() {
+    var s = [];
+    var hexDigits = "0123456789abcdef";
+    for (var i = 0; i < 36; i++) {
+        s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1);
+    }
+    s[14] = "4"; // bits 12-15 of the time_hi_and_version field to 0010
+    s[19] = hexDigits.substr((s[19] & 0x3) | 0x8, 1); // bits 6-7 of the clock_seq_hi_and_reserved to 01
+    s[8] = s[13] = s[18] = s[23] = "-";
+ 
+    var uuid = s.join("");
+    return uuid;
+}
+function encodeUtf8(text) {
+    const code = encodeURIComponent(text);
+    const bytes = [];
+    for (var i = 0; i < code.length; i++) {
+        const c = code.charAt(i);
+        if (c === '%') {
+            const hex = code.charAt(i + 1) + code.charAt(i + 2);
+            const hexVal = parseInt(hex, 16);
+            bytes.push(hexVal);
+            i += 2;
+        } else bytes.push(c.charCodeAt(0));
+    }
+    return bytes;
+}
+function decodeUtf8(bytes) {
+    var encoded = "";
+    for (var i = 0; i < bytes.length; i++) {
+        encoded += '%' + bytes[i].toString(16);
+    }
+    return decodeURIComponent(encoded);
+}
+// 客户端接收到通知信息时调用
+function onMessageArrived(message) {
+    console.log("mqtt onMessageArrived:" + message.payloadString);
+    let topicSplit = message.destinationName.split("/");
+    let type = topicSplit[0];
+    console.log("topic:"+message.destinationName);
+
+    //微站
+    if (type === "PlaneStation2") {
+        
+
+        let msgdata = JSON.parse(message.payloadString);
+      
+        
+
+        if(topicSplit.length == 3){
+            console.log("mqtt history data entry");
+           
+            let fun = topicSplit[2];
+            if(fun == 'UAVDATA'){
+                 if (msgdata.list.length == 0) {
+                    return
+                }
+                uavid = msgdata.list[0].id;
+                if(msgdata.count > 1){
+                    var lng = msgdata.list[msgdata.count-1].E;
+                    var lat = msgdata.list[msgdata.count-1].N;
+                    map.setCenter([lng, lat]);
+                }
+                
+                shishlist = msgdata.list.reverse();
+                console.log('shishlist length:'+shishlist.length);
+                DisplayHistoryData();
+            }
+        }
+        if(topicSplit.length == 2){
+            console.log('mqtt local deviceid:'+deviceid);
+            console.log('mqtt remote deviceid:'+msgdata.id);
+            let infodata = msgdata.data;
+            if(deviceid == msgdata.id){
+                console.log('ok!mqtt local deviceid can match remote deviceid');
+
+
+                let html = '';
+                console.log('parameteraa:'+parameteraa+' parameterbb:'+parameterbb+' parametercc:'+parametercc);
+                if(cur_history_pid === 'PM2_5SL'){
+                    typeSelectValue = infodata["PM2_5"];
+                    var sltemp = (parameteraa*Math.pow(typeSelectValue*1.0/1000,parameterbb)*Math.pow(infodata["SPEED"],-parametercc) ).toFixed(2)
+                    infodata.PM2_5SL = parseFloat(sltemp);
+                    html = html + '<div class="input-item"><span style="font-weight: bold;">SL: &nbsp;</span>' + infodata["PM2_5SL"] + '&nbsp;<span style="font-weight: bold;">g/m<sup>2</sup></span></div>';
+                }
+                if(cur_history_pid === 'PM10SL'){
+                    typeSelectValue = infodata["PM10"];
+                var sltemp = (parameteraa*Math.pow(typeSelectValue*1.0/1000,parameterbb)*Math.pow(infodata["SPEED"],-parametercc) ).toFixed(2)
+                    infodata.PM10SL = parseFloat(sltemp);
+                    html = html + '<div class="input-item"><span style="font-weight: bold;">SL: &nbsp;</span>' + infodata["PM10SL"] + '&nbsp;<span style="font-weight: bold;">g/m<sup>2</sup></span></div>';
+                }
+                if(cur_history_pid === 'PM100SL'){
+                    typeSelectValue = infodata["PM100"];
+                    var sltemp = (parameteraa*Math.pow(typeSelectValue*1.0/1000,parameterbb)*Math.pow(infodata["SPEED"],-parametercc) ).toFixed(2)
+                    infodata.PM100SL = parseFloat(sltemp);
+                    html = html + '<div class="input-item"><span style="font-weight: bold;">SL: &nbsp;</span>' + infodata["PM100SL"] + '&nbsp;<span style="font-weight: bold;">g/m<sup>2</sup></span></div>';
+                }
+                
+
+                let temp = infodata["TEMP"];
+                //var sltemp = ( a*Math.pow(infodata["PM100"]*1.0/1000,b)*Math.pow(infodata["SPEED"],-c) ).toFixed(2)
+            // infodata.SL = parseFloat(sltemp);
+
+
+                //html = html + '<div class="input-item"><span style="font-weight: bold;">PM1.0: &nbsp;</span>' + infodata["PM1.0"] + '&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span></div>';
+                //html = html + '<div class="input-item"><span style="font-weight: bold;">SL: &nbsp;</span>' + infodata["SL"] + '&nbsp;<span style="font-weight: bold;">g/m<sup>2</sup></span></div>';
+                html = html + '<div class="input-item"><span style="font-weight: bold;">PM2.5: &nbsp;</span>' + infodata["PM2_5"] + '&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span></div>';
+                html = html + '<div class="input-item"><span style="font-weight: bold;">PM10: &nbsp;</span>' + infodata["PM10"] + '&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span></div>';
+                html = html + '<div class="input-item"><span style="font-weight: bold;">PM100: &nbsp;</span>' + infodata["PM100"] + '&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span></div>';
+                html = html + '<div class="input-item"><span style="font-weight: bold;">SPEED: &nbsp;</span>' + infodata["SPEED"] + '&nbsp;<span style="font-weight: bold;">km/h</span></div>';
+                html = html + '<div class="input-item"><span style="font-weight: bold;">E: &nbsp;</span>' + infodata["E"] + '&nbsp;<span style="font-weight: bold;"></span></div>';
+                html = html + '<div class="input-item"><span style="font-weight: bold;">N: &nbsp;</span>' + infodata["N"] + '&nbsp;<span style="font-weight: bold;"></span></div>';
+                
+                //html = html + '<div class="input-item"><span style="font-weight: bold;">SO<sub>2</sub>: &nbsp;</span>' + (Unit2Standard(infodata["SO2"], 'SO2')) + '</div>';
+            // html = html + '<div class="input-item"><span style="font-weight: bold;">NO<sub>2</sub>: &nbsp;</span>' + (Unit2Standard(infodata["NO2"], 'NO2')) + '</div>';
+            // html = html + '<div class="input-item"><span style="font-weight: bold;">CO: &nbsp;</span>' + (Unit2Standard(infodata["CO"], 'CO')) + '</div>';
+            // html = html + '<div class="input-item"><span style="font-weight: bold;">O<sub>3</sub>: &nbsp;</span>' + (Unit2Standard(infodata["O3"], 'O3')) + '</div>';
+                //html = html + '<div class="input-item"><span style="font-weight: bold;">VOC: &nbsp;</span>' + Unit2Standard(infodata["VOC"], 'VOC') + '</div>';
+                //html = html + '<div class="input-item"><span style="font-weight: bold;">湿度: &nbsp;</span>' + infodata["HUMI"] + '&nbsp;<span style="font-weight: bold;">%RH</span></div>';
+                //html = html + '<div class="input-item"><span style="font-weight: bold;">温度: &nbsp;</span>' + infodata["TEMP"] + '&nbsp;<span style="font-weight: bold;">℃</span></div>';
+                document.getElementById('realDatas-Panel').innerHTML = "";
+                document.getElementById('realDatas-Panel').innerHTML = html;
+                //获取微站
+                
+                infodata.deviceID = deviceid;
+                infodata.id = uuid();
+                infodata.type = "S";
+                infodata.DATETIME = infodata.DATETIME.replace(/,/g,"");
+
+                
+
+                
+
+                
+                //ws.send(JSON.stringify({
+                //        cmd: "SAVEUAVDATA",
+                //        deviceID: deviceid,
+                //        taskid: id,
+                //        data:message.payloadString
+                //}));
+
+
+            }else{
+                console.log('mqtt local deviceid can not match remote deviceid');
+            }
+        }
+
+
+
+        
+        
+        
+    }
+}
+
+let unitSwitch = false;
+
+function SwitchUnit() {
+    unitSwitch = !unitSwitch;
+    DisplayHistoryData()
+}
+
+function GetValueGB(value, type) {
+    let val = value;
+    switch (type) {
+        case 'NO2':
+            val = value * 2.05
+            break;
+        case 'SO2':
+            val = value * 2.86
+            break;
+        case 'CO':
+            val = value * 1.25
+            break;
+        case 'O3':
+            val = value * 2.14
+            break;
+        case 'VOC':
+            val = value * 2.50
+            break;
+        case 'PM2_5SL':
+            val = value * 1.0
+            break;
+        case 'PM10SL':
+            val = value * 1.0
+            break;
+        case 'PM100SL':
+            val = value * 1.0
+            break;
+        default:
+            break;
+    }
+    return val;
+}
+
+function Unit2Standard(value, type) {
+    let val = 0;
+    switch (type) {
+        case 'NO2':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.05)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+            break;
+        case 'SO2':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.86)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+            break;
+        case 'CO':
+            val = unitSwitch ? `${(value).toFixed(2)}&nbsp;<span style="font-weight: bold;">ppm</span>` : `${(value * 1.25).toFixed(2)}&nbsp;<span style="font-weight: bold;">mg/m<sup>3</sup></span>`
+            break;
+        case 'O3':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.14)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+            break;
+        case 'VOC':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.50)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+            break;
+        case 'PM2_5SL':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.50)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+             break;
+        case 'PM10SL':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.50)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+             break;
+        case 'PM100SL':
+            val = unitSwitch ? `${Math.floor(value)}&nbsp;<span style="font-weight: bold;">ppb</span>` : `${Math.floor(value * 2.50)}&nbsp;<span style="font-weight: bold;">&mu;g/m<sup>3</sup></span>`
+            break;
+    }
+
+    return val;
+}
+
+let bShowLabel = false;
+
+function SwitchLabel() {
+    bShowLabel = !bShowLabel;
+    DisplayHistoryData()
+}
+
+let bShowMulti = false
+let selectedTask = []
+
+function SwitchMultiMode(selectedIndex) {
+    switch (selectedIndex) {
+        case 0: {
+            bShowMulti = false
+        }
+            break;
+        case 1: {
+            bShowMulti = true
+        }
+            break;
+        default: {
+            break;
+        }
+    }
+
+    shishlist = [];
+    GetRecordList();
+}
+
+function SelectTask(taskId, checked) {
+    taskId = `'${taskId}'`
+    if (bShowMulti) {
+        if (checked) {
+            selectedTask.push(taskId)
+        } else {
+            selectedTask.forEach(function (item, index, arr) {
+                if (item === taskId) {
+                    arr.splice(index, 1);
+                }
+            });
+        }
+    } else {
+        selectedTask = [];
+        selectedTask.push(taskId)
+    }
+}
+
+function LoadData() {
+    //window.mqttclient.unsubscribe(topicre + "/" + deviceid);
+    var subtopicshort = topicre + "/" + deviceid;
+    var subtopic = topicre + "/" + deviceid+"/+";
+    window.mqttclient.unsubscribe(subtopicshort);
+    window.mqttclient.unsubscribe(subtopic);
+    console.log("current subtopic unsubscribe:"+subtopicshort);
+    console.log("history subtopic unsubscribe:"+subtopic);
+    //清空界面数据
+    shishlist = [];
+    $('#voyageRecordsModal').modal('hide')
+    //获取微站
+    ws.send(JSON.stringify({
+        cmd: "UAVDATA",
+        deviceID: deviceid,
+        params: {
+            type: 'S',
+            page: 1,
+            limit: 86400,
+            taskid: selectedTask.join(','),
+        }
+    }));
+}
+function goUrl(){
+    window.open('../pages/topgun.html',"_blank");
+    //isSortRoad = false;
+}
+function SortSLData() {
+    //isSortRoad = true;
+    LoadData();
+    setTimeout("goUrl()","1500");
+   
+}
+
+function newPageHistoryData() {
+    window.open('../pages/history.html',"_blank");
+}
+

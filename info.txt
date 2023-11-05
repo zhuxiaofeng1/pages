@@ -1,0 +1,30 @@
+PlaneStation2/866714040061458
+
+
+{
+    "cmd": "SPEED",
+    "msg": "1"
+}
+
+
+{
+    "cmd": "GETUAVTASKID",
+    "countnumber": 1310,
+    "uavtask": {
+        "id": "c4031b3b595549259f05c9d034a9db2a",
+        "starttime": null,
+        "endtime": null,
+        "orgcode": "",
+        "taskid": "e60e7f99270e4c90817199d938dd6b50",
+        "title": "城区走航",
+        "rmark": ""
+    }
+}
+
+dataViewer.js.下载:31786 onmessage {cmd: 'SPEED', msg: '1'}
+dataViewer.js.下载:31825 {cmd: 'SPEED', msg: '1'}
+dataViewer.js.下载:31786 onmessage {cmd: 'SPEED', msg: '100'}
+dataViewer.js.下载:31825 {cmd: 'SPEED', msg: '100'}
+dataViewer.js.下载:31786 onmessage {cmd: 'UAVDATA', count: 1328, list: Array(1328)}
+dataViewer.js.下载:31653 my modify shuju
+dataViewer.js.下载:31908 onMessageArrived:{"id":"866714040061458","data":{"PM1.0":47,"PM2.5":76,"PM10":105,"SO2":41,"NO2":11,"CO":5.40,"O3":26,"VOC":164,"HUMI":56.90,"TEMP":16.30,"N":3534.92908,"E":11043.32677,"H":364.6,"DATETIME":"2000-04-10,15:23:30"}}

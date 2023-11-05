@@ -1,0 +1,192 @@
+<html>
+    <head>
+        <script src="./大气六参数+VOCs走航监测系统V2.0_files/highcharts/highcharts.js"></script>
+        <script src="./大气六参数+VOCs走航监测系统V2.0_files/highcharts/exporting.js"></script>
+        <script src="./大气六参数+VOCs走航监测系统V2.0_files/highcharts/oldie.js"></script>
+        <script src="./大气六参数+VOCs走航监测系统V2.0_files/highcharts/zh_cn.js"></script>
+        <script src="./大气六参数+VOCs走航监测系统V2.0_files/jquery.min.js.下载"></script>
+        <script src="./大气六参数+VOCs走航监测系统V2.0_files/store.js.下载"></script>
+
+    </head>
+    <body>
+        <div id="container" style="min-width:400px;height:400px"></div>
+		<!-- <a href="#" onclick="exceldownload()">导出excel</a> -->
+		<div style="float: right;"><button type="button" class="btn btn-default" onclick="exceldownload()">导出excel</button></div>
+		
+    </body>
+</html>
+<script>
+	/**
+ * 导出 json 数据为 Excle 表格
+ * @param {json} column 列
+ * @param {json} headData 表头数据
+ * @param {json} bodyData 表体数据
+ * @param {string} sheetName 导出的文件名, 可选
+ * 增加 \t 为了不让表格显示科学计数法或者其他格式
+ */
+function jsonToExcel(column, headData, bodyData, sheetName = 'Excle表格') {
+  // 组装表头
+  let theadHtml = '';
+  headData.map(list => {
+    let th = ''
+    list.map(item => {
+      th += `
+        <th colspan="${item.colspan || 1}" rowspan="${item.rowspan || 1}">
+          ${item.text + '\t'}
+        </th>
+      `;
+    });
+    theadHtml += `<tr>${th}</tr>`
+  });
+
+  // 组装表体
+  let tbodyHtml = ''
+  bodyData.map(item => {
+    let td = ''
+    column.map(n => {
+      const val = item[n.key] || ''
+      td += `<td style="text-align: center;">${val + '\t'}</td>`
+    });
+    tbodyHtml += `<tr>${td}</tr>`
+  });
+
+  // 将table添加到html中，在html中加入excel和sheet元素
+  let template = `
+    <html lang="" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head>
+        <title></title>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+              <x:Name>${sheetName}</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+              </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+      </head>
+      <body>
+        <table>
+          <thead>${theadHtml}</thead>
+          <tbody>${tbodyHtml}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  // encodeURIComponent 解决中文乱码
+  const uri = 'data:text/xlsx;charset=utf-8,\ufeff' + encodeURIComponent(template);
+
+  // 通过创建a标签实现
+  const link = document.createElement("a");
+  link.href = uri;
+  link.download = `${sheetName + '.xlsx'}`; // 设置文件名
+  link.click();
+}
+function exceldownload(){
+jsonToExcel(column, headData, bodyData, '道路清洁度排行');
+}
+
+    var roads = store.get("roads");
+
+    console.log('roads：'+roads);
+    console.log('typeof roads:' + typeof roads);
+    var roadsArray = roads.split(",");
+    var values = store.get("values");
+    console.log('values roads:' + typeof values);
+    var t = values.split(",");
+    var valuesArray = new Array();
+    t.forEach(element => {
+		var n  = Number(element).toFixed(3);
+		console.log('toFixed(3):'+n);
+        valuesArray.push(Number(n));
+    });
+    
+
+   
+    console.log('valuesArray:'+ typeof valuesArray);
+    console.log('values:'+values);
+	// 列
+	let column = [
+		{ text: '排名', key: 'order' },
+		{ text: '道路名称', key: 'road' },
+		{ text: '平均值', key: 'value' },
+	];
+
+// 表头
+	let headData = [
+		[{ text: '道路清洁度排行', colspan: 3 }],
+		[
+		{ text: '排名', key: 'order' },
+		{ text: '道路名称', key: 'road' },
+		{ text: '平均值', key: 'value' },
+		]
+	];
+	var datas = new Array();
+	for(i=0;i<roadsArray.length;i++){
+		var obj = {};
+		obj.road = roadsArray[i];
+		obj.value = valuesArray[i];
+		obj.order = i+1;
+		datas.push(obj);
+	}
+// 表体
+let bodyData = datas;
+var chart = Highcharts.chart('container', {
+	chart: {
+		type: 'bar'
+	},
+	title: {
+		text: '道路清洁度排行'
+	},
+	subtitle: {
+		text: ''
+	},
+	xAxis: {
+		categories: roadsArray,
+		title: {
+			text: null
+		}
+
+	},
+	yAxis: {
+
+		title: {
+			text: '克/平方米',
+			align: 'high'
+		},
+		labels: {
+			overflow: 'justify'
+		}
+	},
+	tooltip: {
+		valueSuffix: ' g/m<sup>2'
+	},
+	plotOptions: {
+		bar: {
+			dataLabels: {
+				enabled: true,
+				allowOverlap: true // 允许数据标签重叠
+			}
+		}
+	},
+	legend: {
+		layout: 'vertical',
+		align: 'right',
+		verticalAlign: 'top',
+		x: 0,
+		y: 0.09,
+		floating: true,
+		borderWidth: 1,
+		backgroundColor: ((Highcharts.theme && Highcharts.theme.legendBackgroundColor) || '#FFFFFF'),
+		shadow: true
+	},
+	series: [{
+		name: 'sl',
+		data: valuesArray
+	}]
+});
+</script>

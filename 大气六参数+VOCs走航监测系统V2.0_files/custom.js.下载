@@ -1,0 +1,104 @@
+﻿function covertDate(time) {
+    var t = time.slice(6, 19)
+    var NewDtime = new Date(parseInt(t));
+    return formatShortDatetime(NewDtime);
+}
+
+function convertTime(time) {
+    var t = time.slice(6, 19);
+    var NewDtime = new Date(parseInt(t));
+    return formatShortTime(NewDtime);
+}
+
+function formatDatetime(dt) {
+    var year = dt.getFullYear();
+    var month = dt.getMonth() + 1;
+    var date = dt.getDate();
+    var hour = dt.getHours();
+    var minute = dt.getMinutes();
+    var second = dt.getSeconds();
+    var d = year + "-";
+    if (month < 10)
+        d = d + "0" + month + "-";
+    else
+        d = d + month + "-";
+    if (date < 10)
+        d = d + "0" + date + " ";
+    else
+        d = d + date + " ";
+    if (hour < 10)
+        d = d + "0" + hour + ":";
+    else
+        d = d + hour + ":";
+    if (minute < 10)
+        d = d + "0" + minute + ":";
+    else
+        d = d + minute + ":";
+    if (second < 10)
+        d = d + "0" + second;
+    else
+        d = d + second;
+
+    return d;
+}
+
+function formatDate(dt) {
+    var year = dt.getFullYear();
+    var month = dt.getMonth() + 1;
+    var date = dt.getDate();
+    var d = year;
+    if (month < 10)
+        d = d + "0" + month;
+    else
+        d = d + month.toString();
+    if (date < 10)
+        d = d + "0" + date;
+    else
+        d = d + date;
+
+    return d;
+}
+
+function formatShortDatetime(dt) {
+    var month = dt.getMonth() + 1;
+    var date = dt.getDate();
+    var hour = dt.getHours();
+    var minute = dt.getMinutes();
+    var second = dt.getSeconds();
+    var d = "";
+    if (month < 10)
+        d = "0" + month + "-";
+    else
+        d = month + "-";
+    if (date < 10)
+        d = d + "0" + date + " ";
+    else
+        d = d + date + " ";
+    if (hour < 10)
+        d = d + "0" + hour + ":";
+    else
+        d = d + hour + ":";
+    if (minute < 10)
+        d = d + "0" + minute;
+    else
+        d = d + minute;
+
+    return d;
+}
+
+function formatShortTime(dt) {
+    var hour = dt.getHours();
+    var minute = dt.getMinutes();
+    var second = dt.getSeconds();
+    var d = "";
+    if (hour < 10)
+        d = "0" + hour + ":";
+    else
+        d = hour + ":";
+    if (minute < 10)
+        d = d + "0" + minute;
+    else
+        d = d + minute;
+
+    return d;
+}
