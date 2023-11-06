@@ -20,6 +20,24 @@ var auto;
 var isAcq;
 let mouseLnglat;
 var entryColumnCount = 0;
+var legendArr = [
+    {
+        range: [0, 0.3],
+        color: "blue"
+    },
+    {
+        range: [0.3, 0.6],
+        color: "yellow"
+    },
+    {
+        range: [0.6, 0.9],
+        color: "orange"
+    },
+    {
+        range: [0.9, 1.2],
+        color: "red"
+    },
+];
 
 
 $(function () {
@@ -177,6 +195,7 @@ function LabelContentInput(e) {
 //封装集合对象
 function ConvertToLayerSource(array) {
     let points = [];
+    let maxValue = null;
     for (let i = 0; i < array.length; i++) {
         let p = array[i];
         if (p[cur_history_pid] !== 0) {
@@ -190,7 +209,11 @@ function ConvertToLayerSource(array) {
                 id:id,
                 limit: array.length,
             }
-
+            if (!maxValue) {
+                maxValue = obj.value;
+            } else if (maxValue < obj.value) {
+                maxValue = obj.value;
+            }
             points.push(obj);
         }
     }
@@ -202,6 +225,8 @@ function ConvertToLayerSource(array) {
     //         limit: array.length,
     //     };
     // });
+
+
 
     var convertedPoint = [];
     var sumVal = 0;
@@ -230,7 +255,7 @@ function ConvertToLayerSource(array) {
                     val = sumVal / avgVal;
 
                 //convertedPoint.push({ coordinate: [avgLng, avgLat].join(","), value: val });
-                convertedPoint.push({coordinate: [avgLng, avgLat], value: val,id:item.id });
+                convertedPoint.push({coordinate: [avgLng, avgLat], value: val,id:item.id, color: getColor(val) });
                 avgLng = item.coordinate[0];
                 avgLat = item.coordinate[1];
                 sumVal = item.value;
@@ -254,11 +279,44 @@ function ConvertToLayerSource(array) {
     //convertedPoint.push({ coordinate: [totalLng / totalCount, totalLat / totalCount], value: maxLimit });
     return convertedPoint;
 }
+function getColor(value) {
+    let color = "";
+    legendArr.forEach(item => {
+        if (item.range[0] <= value && value <= item.range[1]) {
+            color = item.color;
+        }
+    })
+    return color;
+}
+function setLegend() {
+    var legends = legendArr.map(item => {
+                // color 为 gradient 传入的格式
+                return `<li class="color-item" style="background-color: ${item.color};display:block;width: 30px;"></li>`
+            });
 
+            var ranges = legendArr.map((item, index) => {
+                // range 可能为小数，可以自行取整计算
+                item.range[0] = formatNum(item.range[0], 2);
+                item.range[1] = formatNum(item.range[1], 2);
+
+                if (index == legendArr.length - 1) {
+                    return `<li class="label-item" style="display: block;font-size: 13px;text-align: left;">${item.range[0]}  g/m<sup>2</sup></li><li class="label-item" style="display: block;font-size: 13px;text-align: left;">${item.range[1]} g/m<sup>2</sup></li>`;
+                }
+                return `<li class="label-item" style="display: block;font-size: 13px;text-align: left;">${item.range[0]} g/m<sup>2</sup></li>`;
+            });
+
+
+            document.getElementById('legend-color').innerHTML = legends.join('');
+            document.getElementById('legend-label').innerHTML = ranges.join('');
+}
 function initPointAdcode(points, layer) {
+    points = points.sort((a, b) => {
+        return a.value - b.value;
+    })
     layer.setData(points, {
         lnglat: 'coordinate',
-        value: 'value'
+        value: 'value',
+        color: 'color'
     });
 
     layer.setOptions({
@@ -287,12 +345,12 @@ function initPointAdcode(points, layer) {
             //radius: 20 * avgVal, // 网格热力半径，单位：米
             radius: 12, // 网格热力半径，单位：像素
             gap: 1, // 网格间距，单位：米
-            //height: [0, 0],
             height: [0, height * displayMode],
-            color: {
-                //scale: 'quantize',
-                //value: ['green', 'yellow', 'orange', 'red', 'purple', 'maroon'],
-                value: ['blue', 'yellow', 'orange', 'red'],
+            //color: {
+                //value: ['blue', 'yellow', 'orange', 'red'],
+            //},
+            color: function(v) {
+                return getColor(v.max);
             },
             text: {
                 content: bShowLabel ? function (v) {
@@ -317,10 +375,8 @@ function initPointAdcode(points, layer) {
     // 事件 legendupdate: 图例数据更新完成回调此函数
     layer.on('legendupdate',
         function (ev) {
-
-
+            return;
             var colorLegend = ev.colorLegend;
-
             var legends = colorLegend.map(item => {
                 // color 为 gradient 传入的格式
                 return `<li class="color-item" style="background-color: ${item.color};display:block;width: 30px;"></li>`

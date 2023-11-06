@@ -402,8 +402,8 @@ function DisplayHistoryData() {
         console.log('roads:'+roads);
         console.log('values:'+values);
         let convertedPoint = ConvertToLayerSource(shishlist);
-        console.log('displayMode'+displayMode);
         initPointAdcode(convertedPoint, history_gridLayer);
+        setLegend();
         history_gridLayer.setFitView();
     }
 }
